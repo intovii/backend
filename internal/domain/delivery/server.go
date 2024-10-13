@@ -2,8 +2,10 @@ package server
 
 import (
 	"backend/config"
+	"backend/internal/domain/entities"
 	"backend/internal/domain/usecase"
 	"context"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
@@ -26,13 +28,6 @@ func NewServer(logger *zap.Logger, cfg *config.ConfigModel, uc *usecase.Usecase)
 }
 
 func (s *Server) OnStart(_ context.Context) error {
-	// _, err := net.Listen("tcp", s.cfg.Server.Host+":"+s.cfg.Server.Port)
-	// if err != nil {
-	// 	s.logger.Error("failed to listen: !!! ", zap.Error(err))
-	// 	return fmt.Errorf("failed to listen:  %w", err)
-	// }
-	// protos.RegisterContentServer(s.RPC, s)
-	// reflection.Register(s.RPC) //по сети теперь видно все методы сети
 	go func() {
 		s.logger.Debug("fiber app started")
 		
@@ -40,7 +35,7 @@ func (s *Server) OnStart(_ context.Context) error {
 			err := c.SendString("And the API is UP!")
 			return err
 		})
-		s.app.Get("/get/user", s.HelloWorld)
+		s.app.Get("/get/product/all_info", s.GetProductAllInfo)
 		if err := s.app.Listen(s.cfg.Server.Host+":"+s.cfg.Server.Port); err != nil {
 			s.logger.Error("failed to serve: " + err.Error())
 		}
@@ -58,4 +53,28 @@ func (s *Server) OnStop(_ context.Context) error {
 func (s *Server) HelloWorld(c *fiber.Ctx) error {
     
     return c.SendString("products")
+}
+
+
+func (s *Server) GetProductAllInfo(FCtx *fiber.Ctx) error {
+	adIDParam := FCtx.Query("ad_id")
+    // Преобразуем ad_id из строки в число (если требуется)
+    adID, err := strconv.Atoi(adIDParam)
+    if err != nil {
+		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid ad_id parameter",
+        })
+    }
+	product := &entities.Advertisment{
+		ID: uint64(adID),
+	}
+	if err := s.Usecase.GetProductAllInfo(
+		FCtx.Context(),
+		product,
+	); err != nil {
+		return err
+	}
+    
+
+    return FCtx.JSON(product)
 }

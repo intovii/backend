@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strconv"
 	"time"
-
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
 )
@@ -139,3 +138,234 @@ func (r *Repository) GetClientWorkouts(ctx context.Context, request *entities.Sc
 
 	return days, nil
 }
+
+
+const queryGetAd = `
+SELECT EXISTS (SELECT id
+FROM advertisements
+WHERE id = $1);
+`
+
+func (r *Repository) IsAdExist(ctx context.Context, product *entities.Advertisment) (bool, error) {
+	var res bool
+	err := r.DB.QueryRow(ctx, queryGetAd, product.ID).Scan(&res)
+	if err != nil{
+		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
+		return false, err
+	}
+	return res, nil
+}
+
+
+
+const queryGetAdInfo = `
+SELECT 
+    a.user_id,
+    a.name AS advertisement_name,
+    a.description,
+    a.price,
+    a.date_placement,
+    a.location,
+    a.views_count,
+    a.date_expire_promotion,
+    a.category_id,
+    a.type_id,
+    tp.name AS type_promotion_name,
+    tp.price AS type_promotion_name,
+    tp.time_live AS type_promotion_name,
+    cp.name AS category_name
+FROM advertisements a
+JOIN types_promotion tp ON a.type_id = tp.id
+JOIN categories_product cp ON a.category_id = cp.id
+WHERE a.id = $1;
+`
+// JOIN categories_product u ON a.user_id = u.id
+
+func (r *Repository) GetProductAllInfo(ctx context.Context, product *entities.Advertisment) error {
+	err := r.DB.QueryRow(
+		ctx,
+		queryGetAdInfo,
+		product.ID,
+	).Scan(
+		&product.User.ID,
+		&product.Name,
+		&product.Description,
+		&product.Price,
+		&product.DatePlacement,
+		&product.Location,
+		&product.ViewsCount,
+		&product.DateExpirePromotion,
+		&product.ProductCategory.ID,
+		&product.TypePromotion.ID,
+		&product.TypePromotion.Name,
+		&product.TypePromotion.Price,
+		&product.TypePromotion.TimeLive,
+		&product.ProductCategory.Name,
+	)
+	if err != nil{
+		r.log.Error("GetUserProfile: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+
+const queryGetUserInfo = `
+SELECT 
+    u.path_ava,
+    u.username,
+    u.firstname,
+    u.lastname,
+    u.number_phone,
+    u.rating,
+    u.verification_status,
+    u.role_id,
+    r.name AS role_name
+FROM users u
+JOIN user_roles r ON u.role_id = r.id
+WHERE u.id = $1;
+
+`
+
+func (r *Repository) GetUserInfo(ctx context.Context, user *entities.User) error {
+	err := r.DB.QueryRow(
+		ctx,
+		queryGetUserInfo,
+		user.ID,
+	).Scan(
+		&user.PathAva,
+		&user.Username,
+		&user.Firstname,
+		&user.Lastname,
+		&user.NumberPhone,
+		&user.Rating,
+		&user.Verification_status,
+		&user.Role.ID,
+		&user.Role.Name,
+		
+	)
+	if err != nil{
+		r.log.Error("GetUserInfo: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+
+const queryGetUser = `
+SELECT EXISTS (SELECT id
+FROM users
+WHERE id = $1);
+`
+
+func (r *Repository) IsUserExist(ctx context.Context, user *entities.User) (bool, error) {
+	var res bool
+	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
+	if err != nil{
+		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
+		return false, err
+	}
+	return res, nil
+}
+
+
+const queryGetReviews = `
+SELECT 
+    r.id,
+    r.text,
+    r.mark,
+    r.reviewer_id,
+	u.username,
+	u.path_ava,
+	u.firstname,
+	u.lastname,
+	u.number_phone,
+	u.rating,
+	u.verification_status,
+	u.role_id
+FROM reviews r
+JOIN users u ON r.reviewer_id = u.id
+WHERE r.advertisement_id = $1;
+`
+
+func (r *Repository) GetReviews(ctx context.Context, product *entities.Advertisment) error {
+	rows, err := r.DB.Query(
+		ctx,
+		queryGetReviews,
+		product.ID,
+	)
+	if err != nil{
+		r.log.Error("GetReviews: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	defer rows.Close()
+
+	// Сканируем результаты в срез
+	for rows.Next() {
+		var review entities.Review
+		if err := rows.Scan(
+			&review.ID,
+			&review.Text,
+			&review.Mark,
+			&review.Reviewer.ID,
+			&review.Reviewer.Username,
+			&review.Reviewer.PathAva,
+			&review.Reviewer.Firstname,
+			&review.Reviewer.Lastname,
+			&review.Reviewer.NumberPhone,
+			&review.Reviewer.Rating,
+			&review.Reviewer.Verification_status,
+			&review.Reviewer.Role.ID,
+		); err != nil {
+			r.log.Error("GetReviews: error with scan row", zap.Error(err))
+			return err		
+		}
+		product.Reviews = append(product.Reviews, review)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.log.Error("GetReviews: error iterating through rows", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+const queryGetPhotos = `
+SELECT 
+	ph.path
+FROM ad_photos ph
+WHERE ph.advertisement_id = $1;
+`
+
+func (r *Repository) GetPhotos(ctx context.Context, product *entities.Advertisment) error {
+	rows, err := r.DB.Query(
+		ctx,
+		queryGetPhotos,
+		product.ID,
+	)
+	if err != nil{
+		r.log.Error("GetPhotos: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	defer rows.Close()
+
+	// Сканируем результаты в срез
+	for rows.Next() {
+		var adPhoto entities.AdPhoto
+		if err := rows.Scan(
+			&adPhoto.Path,
+		); err != nil {
+			r.log.Error("GetPhotos: error with scan row", zap.Error(err))
+			return err		
+		}
+		product.Photos = append(product.Photos, adPhoto)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.log.Error("GetPhotos: error iterating through rows", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+
