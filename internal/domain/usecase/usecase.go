@@ -5,7 +5,9 @@ import (
 	"backend/internal/domain/repository/postgres"
 	"context"
 	"errors"
+	"fmt"
 	"go.uber.org/zap"
+	"log"
 )
 
 type Usecase struct {
@@ -34,23 +36,38 @@ func (uc *Usecase) GetProductAllInfo(ctx context.Context, product *entities.Adve
 		return errors.New("product does not exist")
 	}
 
-	if err := uc.Repo.GetProductAllInfo(ctx, product); err != nil{
+	if err := uc.Repo.GetProductAllInfo(ctx, product); err != nil {
 		uc.log.Error("fail to get Advertisment", zap.Error(err))
 		return err
 	}
 	if exist, err := uc.Repo.IsUserExist(ctx, &product.User); err != nil || !exist {
 		return errors.New("user does not exist")
 	}
-	if err := uc.Repo.GetUserInfo(ctx, &product.User); err != nil{
+	if err := uc.Repo.GetUserInfo(ctx, &product.User); err != nil {
 		uc.log.Error("fail to get Seller by Advertisment ID", zap.Error(err))
 		return err
 	}
-	if err := uc.Repo.GetReviews(ctx, product); err != nil{
+	if err := uc.Repo.GetReviews(ctx, product); err != nil {
 		uc.log.Error("fail to get Seller by Advertisment ID", zap.Error(err))
 		return err
 	}
-	if err := uc.Repo.GetPhotos(ctx, product); err != nil{
+	if err := uc.Repo.GetPhotos(ctx, product); err != nil {
 		uc.log.Error("fail to get Seller by Advertisment ID", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (uc *Usecase) CreateUser(ctx context.Context, user *entities.CreateUser) error {
+	log.Println(user)
+	if exist, err := uc.Repo.IsUserExist(ctx, user); err != nil {
+		return fmt.Errorf("failed to check if user exists: %w", err)
+	} else if exist {
+		return errors.New("the user already exists")
+	}
+	if err := uc.Repo.CreateUser(ctx, user); err != nil {
+		uc.log.Error("fail to create User", zap.Error(err))
 		return err
 	}
 

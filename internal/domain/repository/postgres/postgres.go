@@ -6,10 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"time"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
+	"strconv"
+	"time"
 )
 
 type Repository struct {
@@ -47,7 +47,6 @@ func (r *Repository) OnStop(_ context.Context) error {
 	r.DB.Close()
 	return nil
 }
-
 
 const qGetClientWorkouts = `
 WITH workout_data AS (
@@ -139,7 +138,6 @@ func (r *Repository) GetClientWorkouts(ctx context.Context, request *entities.Sc
 	return days, nil
 }
 
-
 const queryGetAd = `
 SELECT EXISTS (SELECT id
 FROM advertisements
@@ -149,14 +147,12 @@ WHERE id = $1);
 func (r *Repository) IsAdExist(ctx context.Context, product *entities.Advertisment) (bool, error) {
 	var res bool
 	err := r.DB.QueryRow(ctx, queryGetAd, product.ID).Scan(&res)
-	if err != nil{
+	if err != nil {
 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
 		return false, err
 	}
 	return res, nil
 }
-
-
 
 const queryGetAdInfo = `
 SELECT 
@@ -179,6 +175,7 @@ JOIN types_promotion tp ON a.type_id = tp.id
 JOIN categories_product cp ON a.category_id = cp.id
 WHERE a.id = $1;
 `
+
 // JOIN categories_product u ON a.user_id = u.id
 
 func (r *Repository) GetProductAllInfo(ctx context.Context, product *entities.Advertisment) error {
@@ -202,13 +199,12 @@ func (r *Repository) GetProductAllInfo(ctx context.Context, product *entities.Ad
 		&product.TypePromotion.TimeLive,
 		&product.ProductCategory.Name,
 	)
-	if err != nil{
+	if err != nil {
 		r.log.Error("GetUserProfile: error with SELECT FROM", zap.Error(err))
 		return err
 	}
 	return nil
 }
-
 
 const queryGetUserInfo = `
 SELECT 
@@ -239,18 +235,16 @@ func (r *Repository) GetUserInfo(ctx context.Context, user *entities.User) error
 		&user.Lastname,
 		&user.NumberPhone,
 		&user.Rating,
-		&user.Verification_status,
+		&user.VerificationStatus,
 		&user.Role.ID,
 		&user.Role.Name,
-		
 	)
-	if err != nil{
+	if err != nil {
 		r.log.Error("GetUserInfo: error with SELECT FROM", zap.Error(err))
 		return err
 	}
 	return nil
 }
-
 
 const queryGetUser = `
 SELECT EXISTS (SELECT id
@@ -258,16 +252,25 @@ FROM users
 WHERE id = $1);
 `
 
-func (r *Repository) IsUserExist(ctx context.Context, user *entities.User) (bool, error) {
+func (r *Repository) IsUserExist(ctx context.Context, user interface{}) (bool, error) {
 	var res bool
-	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
-	if err != nil{
+	var userID uint64
+
+	switch u := user.(type) {
+	case *entities.User:
+		userID = u.ID
+	case *entities.CreateUser:
+		userID = u.ID
+	default:
+		return false, fmt.Errorf("unsupported user type")
+	}
+	err := r.DB.QueryRow(ctx, queryGetUser, userID).Scan(&res)
+	if err != nil {
 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
 		return false, err
 	}
 	return res, nil
 }
-
 
 const queryGetReviews = `
 SELECT 
@@ -294,7 +297,7 @@ func (r *Repository) GetReviews(ctx context.Context, product *entities.Advertism
 		queryGetReviews,
 		product.ID,
 	)
-	if err != nil{
+	if err != nil {
 		r.log.Error("GetReviews: error with SELECT FROM", zap.Error(err))
 		return err
 	}
@@ -314,11 +317,11 @@ func (r *Repository) GetReviews(ctx context.Context, product *entities.Advertism
 			&review.Reviewer.Lastname,
 			&review.Reviewer.NumberPhone,
 			&review.Reviewer.Rating,
-			&review.Reviewer.Verification_status,
+			&review.Reviewer.VerificationStatus,
 			&review.Reviewer.Role.ID,
 		); err != nil {
 			r.log.Error("GetReviews: error with scan row", zap.Error(err))
-			return err		
+			return err
 		}
 		product.Reviews = append(product.Reviews, review)
 	}
@@ -343,7 +346,7 @@ func (r *Repository) GetPhotos(ctx context.Context, product *entities.Advertisme
 		queryGetPhotos,
 		product.ID,
 	)
-	if err != nil{
+	if err != nil {
 		r.log.Error("GetPhotos: error with SELECT FROM", zap.Error(err))
 		return err
 	}
@@ -356,7 +359,7 @@ func (r *Repository) GetPhotos(ctx context.Context, product *entities.Advertisme
 			&adPhoto.Path,
 		); err != nil {
 			r.log.Error("GetPhotos: error with scan row", zap.Error(err))
-			return err		
+			return err
 		}
 		product.Photos = append(product.Photos, adPhoto)
 	}
@@ -368,4 +371,46 @@ func (r *Repository) GetPhotos(ctx context.Context, product *entities.Advertisme
 	return nil
 }
 
+func (r *Repository) IsUserCreateExist(ctx context.Context, user *entities.CreateUser) (bool, error) {
+	var res bool
+	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
+	if err != nil {
+		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
+		return false, err
+	}
+	return res, nil
+}
 
+const queryCreateUser = `
+INSERT INTO users 
+    (id, path_ava, username, firstname, lastname, number_phone) 
+VALUES
+    ($1, $2, $3, $4, $5, $6)
+`
+
+func (r *Repository) CreateUser(ctx context.Context, user *entities.CreateUser) error {
+	// Выполняем команду INSERT
+	result, err := r.DB.Exec(
+		ctx,
+		queryCreateUser,
+		user.ID,
+		user.PathAva,
+		user.Username,
+		user.Firstname,
+		user.Lastname,
+		user.NumberPhone,
+	)
+	if err != nil {
+		r.log.Error("CreateUser: error with INSERT INTO", zap.Error(err))
+		return err
+	}
+
+	// Проверяем количество затронутых строк
+	rowsAffected := result.RowsAffected()
+	// Если не было затронуто ни одной строки, это может означать, что вставка не прошла
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows affected, user may not be created")
+	}
+
+	return nil
+}
