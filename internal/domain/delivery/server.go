@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
+	"backend/common"
 )
 
 type Server struct {
@@ -30,12 +31,7 @@ func NewServer(logger *zap.Logger, cfg *config.ConfigModel, uc *usecase.Usecase)
 func (s *Server) OnStart(_ context.Context) error {
 	go func() {
 		s.logger.Debug("fiber app started")
-		
-		s.app.Get("/", func(c *fiber.Ctx) error {
-			err := c.SendString("And the API is UP!")
-			return err
-		})
-		s.app.Get("/get/product/all_info", s.GetProductAllInfo)
+		s.initRouter()
 		if err := s.app.Listen(s.cfg.Server.Host+":"+s.cfg.Server.Port); err != nil {
 			s.logger.Error("failed to serve: " + err.Error())
 		}
@@ -50,31 +46,34 @@ func (s *Server) OnStop(_ context.Context) error {
 }
 
 
-func (s *Server) HelloWorld(c *fiber.Ctx) error {
-    
-    return c.SendString("products")
-}
-
-
-func (s *Server) GetProductAllInfo(FCtx *fiber.Ctx) error {
+func (s *Server) GetAdvertismentAllInfo(FCtx *fiber.Ctx) error {
+	var adID int
+	var err error
 	adIDParam := FCtx.Query("ad_id")
     // Преобразуем ad_id из строки в число (если требуется)
-    adID, err := strconv.Atoi(adIDParam)
-    if err != nil {
-		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid ad_id parameter",
-        })
+    if adID, err = strconv.Atoi(adIDParam); err != nil {	
+		s.logger.Error("Invalid ad_id parameter", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusInvalidParams,
+					"text": common.ErrInvalidParams,
+				},
+			},
+		)
     }
-	product := &entities.Advertisment{
+	advertisment := &entities.Advertisment{
 		ID: uint64(adID),
 	}
-	if err := s.Usecase.GetProductAllInfo(
-		FCtx.Context(),
-		product,
-	); err != nil {
-		return err
+	if err = s.Usecase.GetAdvertismentAllInfo(FCtx.Context(), advertisment); err != nil {
+		s.logger.Error("Can not get all advertisment info", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusGetInfo,
+					"text": common.ErrGetInfo,
+				},
+        })
 	}
-    
-
-    return FCtx.JSON(product)
+    return FCtx.JSON(advertisment)
 }

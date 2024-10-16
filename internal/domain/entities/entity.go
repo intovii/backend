@@ -1,83 +1,39 @@
 package entities
 
 import (
+	// "database/sql"
 	"time"
 )
 
 
-type Workout struct {
-	StartTime string
-	EndTime   string
-	FormatID  uint64
-	UsersID   []uint64
-	TrainerID uint64
-	FilialID  uint64
-	Status    string
-	Date      string
-}
-
-type Day struct {
-	Workouts []Workout
-	Date     string
-}
-
-type SchedulerGetter struct {
-	ID    uint64
-	Start time.Time
-	End   time.Time
-}
-
-type UserRole struct {
-	ID uint32
-	Name string
-}
-
-type ProductCategory struct {
+type ReviewDTO struct {
 	ID uint64
-	Name string
+	Text string
+	Mark uint16
+	Reviewer UserDTO
+	AdvertisementID uint64
 }
-
-type TypePromotion struct {
-	ID uint64
-	Name string
-	Price float32
-	TimeLive time.Duration
-}
-
-type User struct {
-	ID uint64
-	PathAva string
-	Username string
-	Firstname string
-	Lastname string
-	NumberPhone string
-	Rating float32
-	Verification_status string
-	Role UserRole 
-}
-
-type Advertisment struct {
-	ID	uint64
-	User User
-	Name string
-	Description string
-	Price float64
-	DatePlacement time.Time
-	Location string
-	TypePromotion TypePromotion
-	ViewsCount uint32
-	DateExpirePromotion time.Time
-	ProductCategory ProductCategory 
-	Reviews []Review
-	Photos []AdPhoto
-}
-
 type Review struct {
 	ID uint64
 	Text string
 	Mark uint16
 	Reviewer User
 	AdvertisementID uint64
+}
+
+func ConvertReviewToDTO(review *Review, dto *ReviewDTO) {
+	dto.ID = review.ID
+	dto.Text = review.Text
+	dto.Mark = review.Mark
+	ConvertUserToDTO(&review.Reviewer, &dto.Reviewer)
+	dto.AdvertisementID = review.AdvertisementID
+}
+func ConvertDTOToReview(dto *ReviewDTO, review *Review) {
+	review.ID = dto.ID
+	review.Text = dto.Text
+	review.Mark = dto.Mark
+	ConvertDTOToUser(&dto.Reviewer, &review.Reviewer,)
+	review.AdvertisementID = dto.AdvertisementID	
 }
 
 type AdPhoto struct {
@@ -90,5 +46,5 @@ type Deal struct {
 	ID uint64
 	AdvertisementID uint64
 	BuyerID uint64
-	DateDeal uint64
+	DateDeal time.Time
 }

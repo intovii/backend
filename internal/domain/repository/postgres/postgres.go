@@ -4,11 +4,10 @@ import (
 	"backend/config"
 	"backend/internal/domain/entities"
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"time"
+
 	"github.com/jackc/pgx/v4/pgxpool"
+	// "github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
@@ -48,107 +47,15 @@ func (r *Repository) OnStop(_ context.Context) error {
 	return nil
 }
 
-
-const qGetClientWorkouts = `
-WITH workout_data AS (
-    SELECT
-        w.date,
-        w.start_time,
-        w.end_time,
-        w.format_id,
-        w.coach_id AS trainerID,
-        wf.filial_id,
-        w.status,
-        ARRAY_AGG(ctw.client_id) AS usersID
-    FROM
-        workouts w
-            LEFT JOIN
-        clientsToWorkout ctw ON w.id = ctw.workout_id
-            LEFT JOIN
-        workoutFormat wf ON w.format_id = wf.id
-    GROUP BY
-        w.date, w.start_time, w.end_time, w.format_id, w.coach_id, wf.filial_id, w.status
-)
-SELECT
-    wd.date,
-    JSON_AGG(
-            JSON_BUILD_OBJECT(
-                    'startTime', wd.start_time,
-                    'endTime', wd.end_time,
-                    'formatID', wd.format_id,
-                    'usersID', wd.usersID,
-                    'trainerID', wd.trainerID,
-                    'filialID', wd.filial_id,
-                    'status', wd.status
-            )
-    ) AS workouts
-FROM
-    workout_data wd
-WHERE
-    wd.date BETWEEN $1 AND $2
-  AND $3 = ANY(wd.usersID)
-GROUP BY
-    wd.date
-ORDER BY
-    wd.date`
-
-func (r *Repository) GetClientWorkouts(ctx context.Context, request *entities.SchedulerGetter) ([]entities.Day, error) {
-	rows, err := r.DB.Query(ctx, qGetClientWorkouts,
-		request.Start.Format(time.DateOnly), request.End.Format(time.DateOnly),
-		request.ID)
-	if err != nil {
-		r.log.Error("fail to get client schedule", zap.Error(err),
-			zap.String("query", qGetClientWorkouts),
-			zap.String("id", strconv.FormatUint(request.ID, 10)),
-			zap.String("start", request.Start.String()),
-			zap.String("start", request.End.String()))
-		return nil, err
-	}
-	defer rows.Close()
-
-	var days []entities.Day
-
-	for rows.Next() {
-		var date string
-		var workoutsJSON []byte
-
-		err := rows.Scan(&date, &workoutsJSON)
-		if err != nil {
-			r.log.Error("fail to scan row", zap.Error(err))
-			return nil, err
-		}
-
-		var workouts []entities.Workout
-		err = json.Unmarshal(workoutsJSON, &workouts)
-		if err != nil {
-			r.log.Error("fail to unmarshal workouts JSON", zap.Error(err))
-			continue
-		}
-
-		days = append(days, entities.Day{
-			Date:     date,
-			Workouts: workouts,
-		})
-	}
-
-	if rows.Err() != nil {
-		r.log.Error("rows iteration error", zap.Error(rows.Err()))
-		return nil, rows.Err()
-	}
-
-	return days, nil
-}
-
-
 const queryGetAd = `
 SELECT EXISTS (SELECT id
 FROM advertisements
 WHERE id = $1);
 `
 
-func (r *Repository) IsAdExist(ctx context.Context, product *entities.Advertisment) (bool, error) {
+func (r *Repository) IsAdExist(ctx context.Context, advertisment *entities.Advertisment) (bool, error) {
 	var res bool
-	err := r.DB.QueryRow(ctx, queryGetAd, product.ID).Scan(&res)
+	err := r.DB.QueryRow(ctx, queryGetAd, advertisment.ID).Scan(&res)
 	if err != nil{
 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
 		return false, err
@@ -181,31 +88,34 @@ WHERE a.id = $1;
 `
 // JOIN categories_product u ON a.user_id = u.id
 
-func (r *Repository) GetProductAllInfo(ctx context.Context, product *entities.Advertisment) error {
-	err := r.DB.QueryRow(
+func (r *Repository) GetAdvertismentAllInfo(ctx context.Context, advertisment *entities.Advertisment) error {
+	adto := &entities.AdvertismentDTO{
+		ID: advertisment.ID,
+	}
+	if err := r.DB.QueryRow(
 		ctx,
 		queryGetAdInfo,
-		product.ID,
+		adto.ID,
 	).Scan(
-		&product.User.ID,
-		&product.Name,
-		&product.Description,
-		&product.Price,
-		&product.DatePlacement,
-		&product.Location,
-		&product.ViewsCount,
-		&product.DateExpirePromotion,
-		&product.ProductCategory.ID,
-		&product.TypePromotion.ID,
-		&product.TypePromotion.Name,
-		&product.TypePromotion.Price,
-		&product.TypePromotion.TimeLive,
-		&product.ProductCategory.Name,
-	)
-	if err != nil{
+		&adto.User.ID,
+		&adto.Name,
+		&adto.Description,
+		&adto.Price,
+		&adto.DatePlacement,
+		&adto.Location,
+		&adto.ViewsCount,
+		&adto.DateExpirePromotion,
+		&adto.AdvertismentCategory.ID,
+		&adto.TypePromotion.ID,
+		&adto.TypePromotion.Name,
+		&adto.TypePromotion.Price,
+		&adto.TypePromotion.TimeLive,
+		&adto.AdvertismentCategory.Name,
+	); err != nil{
 		r.log.Error("GetUserProfile: error with SELECT FROM", zap.Error(err))
 		return err
 	}
+	entities.ConvertDTOToAdvertisment(adto, advertisment)
 	return nil
 }
 
@@ -228,22 +138,26 @@ WHERE u.id = $1;
 `
 
 func (r *Repository) GetUserInfo(ctx context.Context, user *entities.User) error {
+	udto := &entities.UserDTO{
+		ID: user.ID,
+	}
 	err := r.DB.QueryRow(
 		ctx,
 		queryGetUserInfo,
 		user.ID,
 	).Scan(
-		&user.PathAva,
-		&user.Username,
-		&user.Firstname,
-		&user.Lastname,
-		&user.NumberPhone,
-		&user.Rating,
-		&user.Verification_status,
-		&user.Role.ID,
-		&user.Role.Name,
+		&udto.PathAva,
+		&udto.Username,
+		&udto.Firstname,
+		&udto.Lastname,
+		&udto.NumberPhone,
+		&udto.Rating,
+		&udto.VerificationStatus,
+		&udto.Role.ID,
+		&udto.Role.Name,
 		
 	)
+	entities.ConvertDTOToUser(udto, user)
 	if err != nil{
 		r.log.Error("GetUserInfo: error with SELECT FROM", zap.Error(err))
 		return err
@@ -282,17 +196,19 @@ SELECT
 	u.number_phone,
 	u.rating,
 	u.verification_status,
-	u.role_id
+	u.role_id,
+	ur.name
 FROM reviews r
 JOIN users u ON r.reviewer_id = u.id
+JOIN user_roles ur ON u.role_id = ur.id
 WHERE r.advertisement_id = $1;
 `
 
-func (r *Repository) GetReviews(ctx context.Context, product *entities.Advertisment) error {
+func (r *Repository) GetReviews(ctx context.Context, advertisment *entities.Advertisment) error {
 	rows, err := r.DB.Query(
 		ctx,
 		queryGetReviews,
-		product.ID,
+		advertisment.ID,
 	)
 	if err != nil{
 		r.log.Error("GetReviews: error with SELECT FROM", zap.Error(err))
@@ -302,25 +218,28 @@ func (r *Repository) GetReviews(ctx context.Context, product *entities.Advertism
 
 	// Сканируем результаты в срез
 	for rows.Next() {
+		var rdto entities.ReviewDTO
 		var review entities.Review
 		if err := rows.Scan(
-			&review.ID,
-			&review.Text,
-			&review.Mark,
-			&review.Reviewer.ID,
-			&review.Reviewer.Username,
-			&review.Reviewer.PathAva,
-			&review.Reviewer.Firstname,
-			&review.Reviewer.Lastname,
-			&review.Reviewer.NumberPhone,
-			&review.Reviewer.Rating,
-			&review.Reviewer.Verification_status,
-			&review.Reviewer.Role.ID,
+			&rdto.ID,
+			&rdto.Text,
+			&rdto.Mark,
+			&rdto.Reviewer.ID,
+			&rdto.Reviewer.Username,
+			&rdto.Reviewer.PathAva,
+			&rdto.Reviewer.Firstname,
+			&rdto.Reviewer.Lastname,
+			&rdto.Reviewer.NumberPhone,
+			&rdto.Reviewer.Rating,
+			&rdto.Reviewer.VerificationStatus,
+			&rdto.Reviewer.Role.ID,
+			&rdto.Reviewer.Role.Name,
 		); err != nil {
 			r.log.Error("GetReviews: error with scan row", zap.Error(err))
 			return err		
 		}
-		product.Reviews = append(product.Reviews, review)
+		entities.ConvertDTOToReview(&rdto, &review)
+		advertisment.Reviews = append(advertisment.Reviews, review)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -337,11 +256,11 @@ FROM ad_photos ph
 WHERE ph.advertisement_id = $1;
 `
 
-func (r *Repository) GetPhotos(ctx context.Context, product *entities.Advertisment) error {
+func (r *Repository) GetPhotos(ctx context.Context, advertisment *entities.Advertisment) error {
 	rows, err := r.DB.Query(
 		ctx,
 		queryGetPhotos,
-		product.ID,
+		advertisment.ID,
 	)
 	if err != nil{
 		r.log.Error("GetPhotos: error with SELECT FROM", zap.Error(err))
@@ -358,7 +277,7 @@ func (r *Repository) GetPhotos(ctx context.Context, product *entities.Advertisme
 			r.log.Error("GetPhotos: error with scan row", zap.Error(err))
 			return err		
 		}
-		product.Photos = append(product.Photos, adPhoto)
+		advertisment.Photos = append(advertisment.Photos, adPhoto)
 	}
 
 	if err := rows.Err(); err != nil {
