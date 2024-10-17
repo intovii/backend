@@ -1,12 +1,23 @@
 service_name: "hunt"
 
 Postgres:
+  #Viktor 
   host: "127.0.0.1"
-  # port: "6132"
+  port: "6132"
+  password: "password"
+
+  # Nikita
+  # host: "127.0.0.1"
+  # port: "5432"
+  # password: "n164838i"
+  
+  #Server
   # host: "postgres"
-  port: "5432"
+  # port: "5432"
+  # password: "password"
+  
+  #Common
   user: "postgres"
-  password: "n164838i"
   DBName: "bossdb"
   sslMode: "allow"
 
