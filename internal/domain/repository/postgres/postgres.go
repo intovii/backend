@@ -9,6 +9,9 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	// "github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
+	"log"
+	"strconv"
+	"time"
 )
 
 type Repository struct {
@@ -287,4 +290,72 @@ func (r *Repository) GetPhotos(ctx context.Context, advertisment *entities.Adver
 	return nil
 }
 
+const queryGetPhone = `
+SELECT 
+    *
+FROM users
+WHERE number_phone = $1
+`
 
+func (r *Repository) IsPhoneExist(ctx context.Context, user *entities.SqlUser) (bool, error) {
+	var res bool
+	err := r.DB.QueryRow(ctx, queryGetPhone, user.NumberPhone).Scan(&res)
+	log.Println(err)
+	if err != nil {
+		r.log.Error("IsPhoneExist: error with QueryRow", zap.Error(err))
+		return false, err
+	}
+	return res, nil
+
+}
+
+const queryGetUsername = `
+SELECT 
+    *
+FROM users
+WHERE username = $1
+`
+
+func (r *Repository) IsUsernameExist(ctx context.Context, user *entities.SqlUser) (bool, error) {
+	var res bool
+	err := r.DB.QueryRow(ctx, queryGetUsername, user.Username).Scan(&res)
+	log.Println(err)
+	if err != nil {
+		r.log.Error("IsPhoneExist: error with QueryRow", zap.Error(err))
+		return false, err
+	}
+	return res, nil
+
+}
+
+const queryCreateUser = `
+INSERT INTO users 
+    (id, path_ava, username, firstname, lastname, number_phone) 
+VALUES
+    ($1, $2, $3, $4, $5, $6)
+`
+
+func (r *Repository) CreateUser(ctx context.Context, user *entities.SqlUser) error {
+	// Выполняем команду INSERT
+	result, err := r.DB.Exec(
+		ctx,
+		queryCreateUser,
+		user.ID,
+		user.PathAva,
+		user.Username,
+		user.Firstname,
+		user.Lastname,
+		user.NumberPhone,
+	)
+	if err != nil {
+		r.log.Error("CreateUser: error with INSERT INTO", zap.Error(err))
+		return err
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("no rows affected, user may not be created")
+	}
+
+	return nil
+}

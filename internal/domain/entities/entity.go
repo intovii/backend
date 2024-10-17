@@ -14,10 +14,10 @@ type ReviewDTO struct {
 	AdvertisementID uint64
 }
 type Review struct {
-	ID uint64
-	Text string
-	Mark uint16
-	Reviewer User
+	ID              uint64
+	Text            string
+	Mark            uint16
+	Reviewer        User
 	AdvertisementID uint64
 }
 
@@ -33,18 +33,19 @@ func ConvertDTOToReview(dto *ReviewDTO, review *Review) {
 	review.Text = dto.Text
 	review.Mark = dto.Mark
 	ConvertDTOToUser(&dto.Reviewer, &review.Reviewer,)
-	review.AdvertisementID = dto.AdvertisementID	
+	review.AdvertisementID = dto.AdvertisementID
 }
 
 type AdPhoto struct {
-	ID uint64
-	Path string
+	ID              uint64
+	Path            string
 	AdvertisementID uint64
 }
 
 type Deal struct {
-	ID uint64
+	ID              uint64
 	AdvertisementID uint64
 	BuyerID uint64
 	DateDeal time.Time
 }
+
