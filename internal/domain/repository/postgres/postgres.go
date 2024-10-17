@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
+	"log"
 	"strconv"
 	"time"
 )
@@ -252,19 +253,10 @@ FROM users
 WHERE id = $1);
 `
 
-func (r *Repository) IsUserExist(ctx context.Context, user interface{}) (bool, error) {
+func (r *Repository) IsUserExist(ctx context.Context, user *entities.User) (bool, error) {
 	var res bool
-	var userID uint64
 
-	switch u := user.(type) {
-	case *entities.User:
-		userID = u.ID
-	case *entities.CreateUser:
-		userID = u.ID
-	default:
-		return false, fmt.Errorf("unsupported user type")
-	}
-	err := r.DB.QueryRow(ctx, queryGetUser, userID).Scan(&res)
+	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
 	if err != nil {
 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
 		return false, err
@@ -371,14 +363,42 @@ func (r *Repository) GetPhotos(ctx context.Context, product *entities.Advertisme
 	return nil
 }
 
-func (r *Repository) IsUserCreateExist(ctx context.Context, user *entities.CreateUser) (bool, error) {
+const queryGetPhone = `
+SELECT 
+    *
+FROM users
+WHERE number_phone = $1
+`
+
+func (r *Repository) IsPhoneExist(ctx context.Context, user *entities.SqlUser) (bool, error) {
 	var res bool
-	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
+	err := r.DB.QueryRow(ctx, queryGetPhone, user.NumberPhone).Scan(&res)
+	log.Println(err)
 	if err != nil {
-		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
+		r.log.Error("IsPhoneExist: error with QueryRow", zap.Error(err))
 		return false, err
 	}
 	return res, nil
+
+}
+
+const queryGetUsername = `
+SELECT 
+    *
+FROM users
+WHERE username = $1
+`
+
+func (r *Repository) IsUsernameExist(ctx context.Context, user *entities.SqlUser) (bool, error) {
+	var res bool
+	err := r.DB.QueryRow(ctx, queryGetUsername, user.Username).Scan(&res)
+	log.Println(err)
+	if err != nil {
+		r.log.Error("IsPhoneExist: error with QueryRow", zap.Error(err))
+		return false, err
+	}
+	return res, nil
+
 }
 
 const queryCreateUser = `
@@ -388,7 +408,7 @@ VALUES
     ($1, $2, $3, $4, $5, $6)
 `
 
-func (r *Repository) CreateUser(ctx context.Context, user *entities.CreateUser) error {
+func (r *Repository) CreateUser(ctx context.Context, user *entities.SqlUser) error {
 	// Выполняем команду INSERT
 	result, err := r.DB.Exec(
 		ctx,
@@ -405,9 +425,7 @@ func (r *Repository) CreateUser(ctx context.Context, user *entities.CreateUser) 
 		return err
 	}
 
-	// Проверяем количество затронутых строк
 	rowsAffected := result.RowsAffected()
-	// Если не было затронуто ни одной строки, это может означать, что вставка не прошла
 	if rowsAffected == 0 {
 		return fmt.Errorf("no rows affected, user may not be created")
 	}

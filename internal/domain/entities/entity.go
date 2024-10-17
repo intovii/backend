@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -43,17 +44,17 @@ type TypePromotion struct {
 	TimeLive time.Duration
 }
 
-type User struct {
-	ID                 uint64
-	PathAva            string
-	Username           string
-	Firstname          string
-	Lastname           string
-	NumberPhone        string
-	Rating             float32
-	VerificationStatus string
-	Role               UserRole
-}
+//type User struct {
+//	ID                 uint64
+//	PathAva            string
+//	Username           string
+//	Firstname          string
+//	Lastname           string
+//	NumberPhone        string
+//	Rating             float32
+//	VerificationStatus string
+//	Role               UserRole
+//}
 
 type Advertisment struct {
 	ID                  uint64
@@ -92,11 +93,26 @@ type Deal struct {
 	DateDeal        uint64
 }
 
-type CreateUser struct {
-	ID          uint64
-	PathAva     string // Может быть null
-	Username    string // Может быть null
-	Firstname   string // Может быть null
-	Lastname    string // Может быть null
-	NumberPhone string // Может быть null
+type SqlUser struct {
+	ID                 uint64
+	PathAva            sql.NullString // Может быть null
+	Username           sql.NullString // Может быть null
+	Firstname          sql.NullString // Может быть null
+	Lastname           sql.NullString // Может быть null
+	NumberPhone        sql.NullString // Может быть null
+	Rating             float32
+	VerificationStatus string
+	Role               UserRole
+}
+
+type User struct {
+	ID                 uint64
+	PathAva            string
+	Username           string
+	Firstname          string
+	Lastname           string
+	NumberPhone        string
+	Rating             float32
+	VerificationStatus string
+	Role               UserRole
 }

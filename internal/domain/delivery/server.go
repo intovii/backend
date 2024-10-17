@@ -5,6 +5,7 @@ import (
 	"backend/internal/domain/entities"
 	"backend/internal/domain/usecase"
 	"context"
+	"database/sql"
 	"log"
 	"strconv"
 
@@ -76,28 +77,69 @@ func (s *Server) GetProductAllInfo(FCtx *fiber.Ctx) error {
 
 	return FCtx.JSON(product)
 }
+
+func convertedByCreateUser(FCtx *fiber.Ctx, user *entities.User) error {
+	return FCtx.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "User created successfully",
+		"user": fiber.Map{
+			"id":           user.ID,
+			"path_ava":     user.PathAva,
+			"username":     user.Username,
+			"firstname":    user.Firstname,
+			"lastname":     user.Lastname,
+			"number_phone": user.NumberPhone,
+		},
+	})
+}
 func (s *Server) CreateUser(FCtx *fiber.Ctx) error {
-	var user entities.CreateUser
+	var user entities.User
 
 	if err := FCtx.BodyParser(&user); err != nil {
-		return err
+		s.logger.Error("Failed to parse body", zap.Error(err))
+		return FCtx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to parse body",
+		})
 	}
-	log.Println(user)
-	// Создание пользователя в БД
-	err := s.Usecase.CreateUser(
-		FCtx.Context(),
-		&user, // передаем user как указатель
-	)
+	sqlUser := entities.SqlUser{
+		ID:          user.ID,
+		PathAva:     sql.NullString{String: user.PathAva, Valid: user.PathAva != ""},
+		Username:    sql.NullString{String: user.Username, Valid: user.Username != ""},
+		Firstname:   sql.NullString{String: user.Firstname, Valid: user.Firstname != ""},
+		Lastname:    sql.NullString{String: user.Lastname, Valid: user.Lastname != ""},
+		NumberPhone: sql.NullString{String: user.NumberPhone, Valid: user.NumberPhone != ""},
+	}
+	log.Println(sqlUser)
 
-	if err != nil {
+	if err := s.Usecase.IsPhoneExist(
+		FCtx.Context(),
+		&sqlUser,
+	); err != nil {
+		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  1,
+			"message": "number phone is exist",
+		})
+	}
+	if err := s.Usecase.IsUsernameExist(
+		FCtx.Context(),
+		&sqlUser,
+	); err != nil {
+		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  2,
+			"message": "username is exist",
+		})
+	}
+	// Создание пользователя в БД
+	if err := s.Usecase.CreateUser(
+		FCtx.Context(),
+		&sqlUser, // передаем user как указатель
+	); err != nil {
 		// Обработка ошибки
 		s.logger.Error("Error creating user", zap.Error(err))
-		return FCtx.Status(fiber.StatusInternalServerError).SendString("Failed to create user")
+		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Failed to create user",
+		})
 	}
 
 	// Если все прошло успешно
-	return FCtx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "User created successfully",
-		"user":    user,
-	})
+	return convertedByCreateUser(FCtx, &user)
 }

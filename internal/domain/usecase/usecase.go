@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
-	"log"
 )
 
 type Usecase struct {
@@ -59,17 +58,33 @@ func (uc *Usecase) GetProductAllInfo(ctx context.Context, product *entities.Adve
 	return nil
 }
 
-func (uc *Usecase) CreateUser(ctx context.Context, user *entities.CreateUser) error {
-	log.Println(user)
-	if exist, err := uc.Repo.IsUserExist(ctx, user); err != nil {
-		return fmt.Errorf("failed to check if user exists: %w", err)
-	} else if exist {
-		return errors.New("the user already exists")
+func (uc *Usecase) IsPhoneExist(ctx context.Context, user *entities.SqlUser) error {
+	if user.NumberPhone.Valid == true {
+		if exist, err := uc.Repo.IsPhoneExist(ctx, user); err != nil || !exist {
+			return fmt.Errorf("the phone number is already there: %w", err)
+		}
 	}
+	return nil
+}
+
+func (uc *Usecase) IsUsernameExist(ctx context.Context, user *entities.SqlUser) error {
+	if user.Username.Valid == true {
+		if exist, err := uc.Repo.IsUsernameExist(ctx, user); err != nil || !exist {
+			return fmt.Errorf("the phone number is already there: %w", err)
+		}
+	}
+	return nil
+}
+func (uc *Usecase) CreateUser(ctx context.Context, user *entities.SqlUser) error {
+	//if exist, err := uc.Repo.IsUserExist(ctx, user); err != nil {
+	//	return fmt.Errorf("failed to check if user exists: %w", err)
+	//} else if exist {
+	//	return errors.New("the user already exists")
+	//}
+
 	if err := uc.Repo.CreateUser(ctx, user); err != nil {
 		uc.log.Error("fail to create User", zap.Error(err))
 		return err
 	}
-
 	return nil
 }
