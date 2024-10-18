@@ -5,6 +5,7 @@ import (
 	"backend/internal/domain/repository/postgres"
 	"context"
 	"errors"
+
 	"go.uber.org/zap"
 )
 
@@ -38,11 +39,11 @@ func (uc *Usecase) GetAdvertismentAllInfo(ctx context.Context, advertisment *ent
 		uc.log.Error("fail to get seller info by Advertisment ID", zap.Error(err))
 		return err
 	}
-	if err := uc.Repo.GetReviews(ctx, advertisment); err != nil{
+	if err := uc.Repo.GetAdvertismentReviews(ctx, advertisment); err != nil{
 		uc.log.Error("fail to get Reviews by Advertisment ID", zap.Error(err))
 		return err
 	}
-	if err := uc.Repo.GetPhotos(ctx, advertisment); err != nil{
+	if err := uc.Repo.GetAdvertismentPhotos(ctx, advertisment); err != nil{
 		uc.log.Error("fail to get Photos by Advertisment ID", zap.Error(err))
 		return err
 	}
@@ -80,3 +81,37 @@ func (uc *Usecase) GetAdvertismentAllInfo(ctx context.Context, advertisment *ent
 // 	}
 // 	return nil
 // }
+
+
+func (uc *Usecase) GetProfileUserAllInfo(ctx context.Context, user *entities.User) error {
+	if exist, err := uc.Repo.IsUserExist(ctx, user); err != nil || !exist {
+		uc.log.Error("user does not exist", zap.Error(err))
+		return errors.New("user does not exist")
+	}
+	if err := uc.Repo.GetUserInfo(ctx, user); err != nil{
+		uc.log.Error("fail to get user profile info", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (uc *Usecase) GetProfileUserStatistics(ctx context.Context, uID uint64) (*[]*entities.Statistic, error) {
+	var stats []*entities.Statistic
+	if exist, err := uc.Repo.IsUserExist(ctx, &entities.User{ID:uID}); err != nil || !exist {
+		uc.log.Error("user does not exist", zap.Error(err))
+		return nil, errors.New("user does not exist")
+	}
+
+	if err := uc.Repo.GetProfileUserStatistics(ctx, uID, &stats); err != nil {
+		uc.log.Error("fail to ads by buyer id", zap.Error(err))
+		return nil, err
+	}
+	for _, stat := range stats{
+		if err := uc.Repo.GetStatisticAdPhoto(ctx, stat); err != nil{
+			uc.log.Error("fail to get Photos by Advertisment ID", zap.Error(err))
+		}
+	}
+	
+	return &stats, nil
+}

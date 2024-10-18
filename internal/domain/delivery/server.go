@@ -79,19 +79,19 @@ func (s *Server) GetAdvertismentAllInfo(FCtx *fiber.Ctx) error {
     return FCtx.JSON(advertisment)
 }
 
-func convertedByCreateUser(FCtx *fiber.Ctx, user *entities.User) error {
-	return FCtx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "User created successfully",
-		"user": fiber.Map{
-			"id":           user.ID,
-			"path_ava":     user.PathAva,
-			"username":     user.Username,
-			"firstname":    user.Firstname,
-			"lastname":     user.Lastname,
-			"number_phone": user.NumberPhone,
-		},
-	})
-}
+// func convertedByCreateUser(FCtx *fiber.Ctx, user *entities.User) error {
+// 	return FCtx.Status(fiber.StatusCreated).JSON(fiber.Map{
+// 		"message": "User created successfully",
+// 		"user": fiber.Map{
+// 			"id":           user.ID,
+// 			"path_ava":     user.PathAva,
+// 			"username":     user.Username,
+// 			"firstname":    user.Firstname,
+// 			"lastname":     user.Lastname,
+// 			"number_phone": user.NumberPhone,
+// 		},
+// 	})
+// }
 // func (s *Server) CreateUser(FCtx *fiber.Ctx) error {
 // 	var user entities.User
 
@@ -144,3 +144,64 @@ func convertedByCreateUser(FCtx *fiber.Ctx, user *entities.User) error {
 // 	// Если все прошло успешно
 // 	return convertedByCreateUser(FCtx, &user)
 // }
+
+func (s *Server) GetProfileUserAllInfo(FCtx *fiber.Ctx) error {
+	var uID int
+	var err error
+	uIDParam := FCtx.Query("user_id")
+    if uID, err = strconv.Atoi(uIDParam); err != nil {
+		s.logger.Error("Invalid user_id parameter", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusInvalidParams,
+					"text": common.ErrInvalidParams,
+				},
+			},
+		)
+    }
+	user := &entities.User{
+		ID: uint64(uID),
+	}
+	if err = s.Usecase.GetProfileUserAllInfo(FCtx.Context(), user); err != nil {
+		s.logger.Error("Can not get all user info", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusGetInfo,
+					"text": common.ErrGetInfo,
+				},
+        })
+	}
+    return FCtx.JSON(user)
+}
+
+func (s *Server) GetProfileUserStatistics(FCtx *fiber.Ctx) error {
+	var uID int
+	var err error
+	uIDParam := FCtx.Query("user_id")
+    if uID, err = strconv.Atoi(uIDParam); err != nil {
+		s.logger.Error("Invalid user_id parameter", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusInvalidParams,
+					"text": common.ErrInvalidParams,
+				},
+			},
+		)
+    }
+	var statisticAdsInfo *[]*entities.Statistic
+	if statisticAdsInfo, err = s.Usecase.GetProfileUserStatistics(FCtx.Context(), uint64(uID)); err != nil {
+		s.logger.Error("Can not get statistics info", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusGetInfo,
+					"text": common.ErrGetInfo,
+				},
+			},
+		)
+	}
+	return FCtx.JSON(statisticAdsInfo)
+}

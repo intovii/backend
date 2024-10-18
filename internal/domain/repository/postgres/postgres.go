@@ -191,7 +191,7 @@ SELECT
     r.id,
     r.text,
     r.mark,
-    r.reviewer_id,
+    d.buyer_id,
 	u.username,
 	u.path_ava,
 	u.firstname,
@@ -202,12 +202,13 @@ SELECT
 	u.role_id,
 	ur.name
 FROM reviews r
-JOIN users u ON r.reviewer_id = u.id
+JOIN deals d ON d.id = r.deal_id
+JOIN users u ON d.buyer_id = u.id
 JOIN user_roles ur ON u.role_id = ur.id
-WHERE r.advertisement_id = $1;
+WHERE d.advertisement_id = $1;
 `
 
-func (r *Repository) GetReviews(ctx context.Context, advertisment *entities.Advertisment) error {
+func (r *Repository) GetAdvertismentReviews(ctx context.Context, advertisment *entities.Advertisment) error {
 	rows, err := r.DB.Query(
 		ctx,
 		queryGetReviews,
@@ -259,7 +260,7 @@ FROM ad_photos ph
 WHERE ph.advertisement_id = $1;
 `
 
-func (r *Repository) GetPhotos(ctx context.Context, advertisment *entities.Advertisment) error {
+func (r *Repository) GetAdvertismentPhotos(ctx context.Context, advertisment *entities.Advertisment) error {
 	rows, err := r.DB.Query(
 		ctx,
 		queryGetPhotos,
@@ -290,12 +291,22 @@ func (r *Repository) GetPhotos(ctx context.Context, advertisment *entities.Adver
 	return nil
 }
 
-const queryGetPhone = `
-SELECT 
-    *
-FROM users
-WHERE number_phone = $1
-`
+func (r *Repository) GetStatisticAdPhoto(ctx context.Context, stat *entities.Statistic) error {
+	if err := r.DB.QueryRow(ctx, queryGetPhotos, stat.AdID,).Scan(&stat.AdPhoto.Path,); err != nil{
+		r.log.Error("GetStatisticAdPhoto: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	
+	return nil
+}
+
+
+// const queryGetPhone = `
+// SELECT 
+//     *
+// FROM users
+// WHERE number_phone = $1
+// `
 
 // func (r *Repository) IsPhoneExist(ctx context.Context, user *entities.SqlUser) (bool, error) {
 // 	var res bool
@@ -358,4 +369,70 @@ WHERE number_phone = $1
 // 	}
 
 // 	return nil
+// }
+
+
+const queryGetAdsByBuyerID = `
+	SELECT 
+		d.advertisement_id,
+		a.name,
+		a.price,
+		r.mark
+	FROM deals d
+	JOIN reviews r ON d.id = r.deal_id
+	JOIN advertisements a ON d.advertisement_id = a.id
+	WHERE d.buyer_id = $1;
+`
+
+func (r *Repository) GetProfileUserStatistics(ctx context.Context, uID uint64, stats *[]*entities.Statistic) error {
+	rows, err := r.DB.Query(ctx, queryGetAdsByBuyerID, uID)
+	if err != nil{
+		r.log.Error("GetAdvertismentsByBuyerID: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	defer rows.Close()
+
+	// Сканируем результаты в срез
+	for rows.Next() {
+		stat := &entities.Statistic{}
+		dto := &entities.StatisticDTO{
+			AdReview: entities.Review{},
+		}
+		if err := rows.Scan(
+			&dto.AdID,
+			&dto.AdName,
+			&dto.AdPrice,
+			&dto.AdReview.Mark,
+			); err != nil {
+			r.log.Error("GetAdvertismentsByBuyerID: error with scan row", zap.Error(err))
+			return err		
+		}
+		entities.ConvertDTOToStatistic(dto, stat)
+		*stats = append(*stats, stat)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.log.Error("GetAdvertismentsByBuyerID: error iterating through rows", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+
+
+
+// const queryGetReviewByAdReviewer = `
+// SELECT EXISTS (SELECT id
+// FROM reviews
+// WHERE advertisement_id = $1 AND reviewer_id = $2);
+// `
+
+// func (r *Repository) IsRviewExistByAdReviewer(ctx context.Context, ad uID uint64) (bool, error) {
+// 	var res bool
+// 	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
+// 	if err != nil{
+// 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
+// 		return false, err
+// 	}
+// 	return res, nil
 // }

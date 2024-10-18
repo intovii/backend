@@ -8,4 +8,6 @@ func (s *Server) initRouter() {
 		return err
 	})
 	s.app.Get("/get/advertisment/all_info", s.GetAdvertismentAllInfo)
+	s.app.Get("/get/profile/all_info", s.GetProfileUserAllInfo)
+	s.app.Get("/get/profile/statistics", s.GetProfileUserStatistics)
 }
