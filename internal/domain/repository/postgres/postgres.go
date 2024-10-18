@@ -4,8 +4,9 @@ import (
 	"backend/config"
 	"backend/internal/domain/entities"
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
-
 	"github.com/jackc/pgx/v4/pgxpool"
 	// "github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
@@ -59,14 +60,12 @@ WHERE id = $1);
 func (r *Repository) IsAdExist(ctx context.Context, advertisment *entities.Advertisment) (bool, error) {
 	var res bool
 	err := r.DB.QueryRow(ctx, queryGetAd, advertisment.ID).Scan(&res)
-	if err != nil{
+	if err != nil {
 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
 		return false, err
 	}
 	return res, nil
 }
-
-
 
 const queryGetAdInfo = `
 SELECT 
@@ -89,6 +88,7 @@ JOIN types_promotion tp ON a.type_id = tp.id
 JOIN categories_product cp ON a.category_id = cp.id
 WHERE a.id = $1;
 `
+
 // JOIN categories_product u ON a.user_id = u.id
 
 func (r *Repository) GetAdvertismentAllInfo(ctx context.Context, advertisment *entities.Advertisment) error {
@@ -114,14 +114,13 @@ func (r *Repository) GetAdvertismentAllInfo(ctx context.Context, advertisment *e
 		&adto.TypePromotion.Price,
 		&adto.TypePromotion.TimeLive,
 		&adto.AdvertismentCategory.Name,
-	); err != nil{
+	); err != nil {
 		r.log.Error("GetUserProfile: error with SELECT FROM", zap.Error(err))
 		return err
 	}
 	entities.ConvertDTOToAdvertisment(adto, advertisment)
 	return nil
 }
-
 
 const queryGetUserInfo = `
 SELECT 
@@ -158,16 +157,14 @@ func (r *Repository) GetUserInfo(ctx context.Context, user *entities.User) error
 		&udto.VerificationStatus,
 		&udto.Role.ID,
 		&udto.Role.Name,
-		
 	)
 	entities.ConvertDTOToUser(udto, user)
-	if err != nil{
+	if err != nil {
 		r.log.Error("GetUserInfo: error with SELECT FROM", zap.Error(err))
 		return err
 	}
 	return nil
 }
-
 
 const queryGetUser = `
 SELECT EXISTS (SELECT id
@@ -178,13 +175,12 @@ WHERE id = $1);
 func (r *Repository) IsUserExist(ctx context.Context, user *entities.User) (bool, error) {
 	var res bool
 	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
-	if err != nil{
+	if err != nil {
 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
 		return false, err
 	}
 	return res, nil
 }
-
 
 const queryGetReviews = `
 SELECT 
@@ -213,7 +209,7 @@ func (r *Repository) GetReviews(ctx context.Context, advertisment *entities.Adve
 		queryGetReviews,
 		advertisment.ID,
 	)
-	if err != nil{
+	if err != nil {
 		r.log.Error("GetReviews: error with SELECT FROM", zap.Error(err))
 		return err
 	}
@@ -239,7 +235,7 @@ func (r *Repository) GetReviews(ctx context.Context, advertisment *entities.Adve
 			&rdto.Reviewer.Role.Name,
 		); err != nil {
 			r.log.Error("GetReviews: error with scan row", zap.Error(err))
-			return err		
+			return err
 		}
 		entities.ConvertDTOToReview(&rdto, &review)
 		advertisment.Reviews = append(advertisment.Reviews, review)
@@ -265,7 +261,7 @@ func (r *Repository) GetPhotos(ctx context.Context, advertisment *entities.Adver
 		queryGetPhotos,
 		advertisment.ID,
 	)
-	if err != nil{
+	if err != nil {
 		r.log.Error("GetPhotos: error with SELECT FROM", zap.Error(err))
 		return err
 	}
@@ -278,7 +274,7 @@ func (r *Repository) GetPhotos(ctx context.Context, advertisment *entities.Adver
 			&adPhoto.Path,
 		); err != nil {
 			r.log.Error("GetPhotos: error with scan row", zap.Error(err))
-			return err		
+			return err
 		}
 		advertisment.Photos = append(advertisment.Photos, adPhoto)
 	}
@@ -291,71 +287,79 @@ func (r *Repository) GetPhotos(ctx context.Context, advertisment *entities.Adver
 }
 
 const queryGetPhone = `
-SELECT 
-    *
-FROM users
-WHERE number_phone = $1
+	SELECT EXISTS (SELECT 1 FROM users WHERE number_phone = $1)
 `
 
-// func (r *Repository) IsPhoneExist(ctx context.Context, user *entities.SqlUser) (bool, error) {
-// 	var res bool
-// 	err := r.DB.QueryRow(ctx, queryGetPhone, user.NumberPhone).Scan(&res)
-// 	log.Println(err)
-// 	if err != nil {
-// 		r.log.Error("IsPhoneExist: error with QueryRow", zap.Error(err))
-// 		return false, err
-// 	}
-// 	return res, nil
+func (r *Repository) IsPhoneExist(ctx context.Context, user *entities.User) (bool, error) {
+	var exists bool
+	// Выполняем запрос к базе данных
+	err := r.DB.QueryRow(ctx, queryGetPhone, user.NumberPhone).Scan(&exists)
 
-// }
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Если номер телефона не найден, возвращаем false и nil
+			return false, nil
+		}
+		// Логируем ошибку и возвращаем её, если произошла другая ошибка
+		r.log.Error("IsPhoneExist: error with QueryRow", zap.Error(err))
+		return false, err // Возвращаем false и ошибку
+	}
 
-// const queryGetUsername = `
-// SELECT 
-//     *
-// FROM users
-// WHERE username = $1
-// `
+	return exists, nil // Возвращаем результат, если найдено
+}
 
-// func (r *Repository) IsUsernameExist(ctx context.Context, user *entities.SqlUser) (bool, error) {
-// 	var res bool
-// 	err := r.DB.QueryRow(ctx, queryGetUsername, user.Username).Scan(&res)
-// 	log.Println(err)
-// 	if err != nil {
-// 		r.log.Error("IsPhoneExist: error with QueryRow", zap.Error(err))
-// 		return false, err
-// 	}
-// 	return res, nil
+const queryGetUsername = `
+	SELECT EXISTS (SELECT 1 FROM users WHERE username = $1)
+`
 
-// }
+func (r *Repository) IsUsernameExist(ctx context.Context, user *entities.User) (bool, error) {
+	var exists bool
+	err := r.DB.QueryRow(ctx, queryGetUsername, user.Username).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Если username не найден, возвращаем false и nil
+			return false, nil
+		}
+		// Логируем ошибку и возвращаем её, если произошла другая ошибка
+		r.log.Error("IsUsernameExist: error with QueryRow", zap.Error(err))
+		return false, err // Возвращаем false и ошибку
+	}
 
-// const queryCreateUser = `
-// INSERT INTO users 
-//     (id, path_ava, username, firstname, lastname, number_phone) 
-// VALUES
-//     ($1, $2, $3, $4, $5, $6)
-// `
+	return exists, nil // Возвращаем результат, если найдено
+}
 
-// func (r *Repository) CreateUser(ctx context.Context, user *entities.SqlUser) error {
-// 	// Выполняем команду INSERT
-// 	result, err := r.DB.Exec(
-// 		ctx,
-// 		queryCreateUser,
-// 		user.ID,
-// 		user.PathAva,
-// 		user.Username,
-// 		user.Firstname,
-// 		user.Lastname,
-// 		user.NumberPhone,
-// 	)
-// 	if err != nil {
-// 		r.log.Error("CreateUser: error with INSERT INTO", zap.Error(err))
-// 		return err
-// 	}
+const queryCreateUser = `
+INSERT INTO users 
+     (id, path_ava, username, firstname, lastname, number_phone) 
+VALUES
+     ($1, $2, $3, $4, $5, $6)
+`
 
-// 	rowsAffected := result.RowsAffected()
-// 	if rowsAffected == 0 {
-// 		return fmt.Errorf("no rows affected, user may not be created")
-// 	}
+func (r *Repository) CreateUser(ctx context.Context, user *entities.User) error {
+	userDto := &entities.UserDTO{
+		ID: user.ID,
+	}
+	entities.ConvertUserToDTO(user, userDto)
+	result, err := r.DB.Exec(
+		ctx,
+		queryCreateUser,
+		userDto.ID,
+		userDto.PathAva,
+		userDto.Username,
+		userDto.Firstname,
+		userDto.Lastname,
+		userDto.NumberPhone,
+	)
+	if err != nil {
+		r.log.Error("CreateUser: error with INSERT INTO", zap.Error(err))
+		return err
+	}
 
-// 	return nil
-// }
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		r.log.Error("no rows affected, user may not be created")
+		return err
+	}
+
+	return err
+}

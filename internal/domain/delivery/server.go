@@ -5,19 +5,21 @@ import (
 	"backend/internal/domain/entities"
 	"backend/internal/domain/usecase"
 	"context"
+	"log"
+
 	// "database/sql"
 	// "log"
 	"strconv"
 
+	"backend/common"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
-	"backend/common"
 )
 
 type Server struct {
 	logger  *zap.Logger
 	cfg     *config.ConfigModel
-	app 	*fiber.App
+	app     *fiber.App
 	Usecase *usecase.Usecase
 }
 
@@ -25,7 +27,7 @@ func NewServer(logger *zap.Logger, cfg *config.ConfigModel, uc *usecase.Usecase)
 	return &Server{
 		logger:  logger,
 		cfg:     cfg,
-		app:	 fiber.New(),
+		app:     fiber.New(),
 		Usecase: uc,
 	}, nil
 }
@@ -34,7 +36,7 @@ func (s *Server) OnStart(_ context.Context) error {
 	go func() {
 		s.logger.Debug("fiber app started")
 		s.initRouter()
-		if err := s.app.Listen(s.cfg.Server.Host+":"+s.cfg.Server.Port); err != nil {
+		if err := s.app.Listen(s.cfg.Server.Host + ":" + s.cfg.Server.Port); err != nil {
 			s.logger.Error("failed to serve: " + err.Error())
 		}
 	}()
@@ -51,18 +53,18 @@ func (s *Server) GetAdvertismentAllInfo(FCtx *fiber.Ctx) error {
 	var adID int
 	var err error
 	adIDParam := FCtx.Query("ad_id")
-    // Преобразуем ad_id из строки в число (если требуется)
-    if adID, err = strconv.Atoi(adIDParam); err != nil {
+	// Преобразуем ad_id из строки в число (если требуется)
+	if adID, err = strconv.Atoi(adIDParam); err != nil {
 		s.logger.Error("Invalid ad_id parameter", zap.Error(err))
 		return FCtx.Status(fiber.StatusBadRequest).JSON(
 			fiber.Map{
 				"message": fiber.Map{
 					"status": common.StatusInvalidParams,
-					"text": common.ErrInvalidParams,
+					"text":   common.ErrInvalidParams,
 				},
 			},
 		)
-    }
+	}
 	advertisment := &entities.Advertisment{
 		ID: uint64(adID),
 	}
@@ -72,11 +74,11 @@ func (s *Server) GetAdvertismentAllInfo(FCtx *fiber.Ctx) error {
 			fiber.Map{
 				"message": fiber.Map{
 					"status": common.StatusGetInfo,
-					"text": common.ErrGetInfo,
+					"text":   common.ErrGetInfo,
 				},
-        })
+			})
 	}
-    return FCtx.JSON(advertisment)
+	return FCtx.JSON(advertisment)
 }
 
 func convertedByCreateUser(FCtx *fiber.Ctx, user *entities.User) error {
@@ -92,55 +94,33 @@ func convertedByCreateUser(FCtx *fiber.Ctx, user *entities.User) error {
 		},
 	})
 }
-// func (s *Server) CreateUser(FCtx *fiber.Ctx) error {
-// 	var user entities.User
+func (s *Server) CreateUser(FCtx *fiber.Ctx) error {
+	var user entities.User
+	if err := FCtx.BodyParser(&user); err != nil {
+		s.logger.Error("Failed to parse body", zap.Error(err))
+		return FCtx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Failed to parse body",
+		})
+	}
+	// Создание пользователя в БД
+	resultInterface := s.Usecase.CreateUser(
+		FCtx.Context(),
+		&user,
+	)
 
-// 	if err := FCtx.BodyParser(&user); err != nil {
-// 		s.logger.Error("Failed to parse body", zap.Error(err))
-// 		return FCtx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-// 			"message": "Failed to parse body",
-// 		})
-// 	}
-// 	sqlUser := entities.SqlUser{
-// 		ID:          user.ID,
-// 		PathAva:     sql.NullString{String: user.PathAva, Valid: user.PathAva != ""},
-// 		Username:    sql.NullString{String: user.Username, Valid: user.Username != ""},
-// 		Firstname:   sql.NullString{String: user.Firstname, Valid: user.Firstname != ""},
-// 		Lastname:    sql.NullString{String: user.Lastname, Valid: user.Lastname != ""},
-// 		NumberPhone: sql.NullString{String: user.NumberPhone, Valid: user.NumberPhone != ""},
-// 	}
-// 	log.Println(sqlUser)
+	// Приведение результата к типу fiber.Map
+	result, ok := resultInterface.(fiber.Map)
+	if !ok {
+		// Обработка ошибки, если приведение не удалось
+		log.Println("Ошибка приведения результата")
+		return nil
+	}
 
-// 	if err := s.Usecase.IsPhoneExist(
-// 		FCtx.Context(),
-// 		&sqlUser,
-// 	); err != nil {
-// 		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-// 			"status":  1,
-// 			"message": "number phone is exist",
-// 		})
-// 	}
-// 	if err := s.Usecase.IsUsernameExist(
-// 		FCtx.Context(),
-// 		&sqlUser,
-// 	); err != nil {
-// 		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-// 			"status":  2,
-// 			"message": "username is exist",
-// 		})
-// 	}
-// 	// Создание пользователя в БД
-// 	if err := s.Usecase.CreateUser(
-// 		FCtx.Context(),
-// 		&sqlUser, // передаем user как указатель
-// 	); err != nil {
-// 		// Обработка ошибки
-// 		s.logger.Error("Error creating user", zap.Error(err))
-// 		return FCtx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-// 			"message": "Failed to create user",
-// 		})
-// 	}
-
-// 	// Если все прошло успешно
-// 	return convertedByCreateUser(FCtx, &user)
-// }
+	// Доступ к полям status и message
+	status := result["status"].(int)
+	if status != 4 {
+		return FCtx.Status(fiber.StatusBadRequest).JSON(resultInterface)
+	} else {
+		return FCtx.Status(fiber.StatusCreated).JSON(resultInterface)
+	}
+}

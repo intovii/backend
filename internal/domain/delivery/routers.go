@@ -8,4 +8,5 @@ func (s *Server) initRouter() {
 		return err
 	})
 	s.app.Get("/get/advertisment/all_info", s.GetAdvertismentAllInfo)
+	s.app.Post("/user/create", s.CreateUser)
 }
