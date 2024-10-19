@@ -5,12 +5,11 @@ import (
 	"time"
 )
 
-
 type ReviewDTO struct {
-	ID uint64
-	Text string
-	Mark uint16
-	Reviewer UserDTO
+	ID              uint64
+	Text            string
+	Mark            uint16
+	Reviewer        UserDTO
 	AdvertisementID uint64
 }
 type Review struct {
@@ -32,7 +31,7 @@ func ConvertDTOToReview(dto *ReviewDTO, review *Review) {
 	review.ID = dto.ID
 	review.Text = dto.Text
 	review.Mark = dto.Mark
-	ConvertDTOToUser(&dto.Reviewer, &review.Reviewer,)
+	ConvertDTOToUser(&dto.Reviewer, &review.Reviewer)
 	review.AdvertisementID = dto.AdvertisementID
 }
 
@@ -45,7 +44,6 @@ type AdPhoto struct {
 type Deal struct {
 	ID              uint64
 	AdvertisementID uint64
-	BuyerID uint64
-	DateDeal time.Time
+	BuyerID         uint64
+	DateDeal        time.Time
 }
-

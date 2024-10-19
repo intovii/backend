@@ -7,7 +7,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"log"
+
 	// "github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 	// "log"
@@ -136,7 +139,6 @@ SELECT
 FROM users u
 JOIN user_roles r ON u.role_id = r.id
 WHERE u.id = $1;
-
 `
 
 func (r *Repository) GetUserInfo(ctx context.Context, user *entities.User) error {
@@ -362,4 +364,98 @@ func (r *Repository) CreateUser(ctx context.Context, user *entities.User) error 
 	}
 
 	return err
+}
+
+func (r *Repository) GetUserByID(ctx context.Context, user *entities.User) (*entities.User, error) {
+	userDto := &entities.UserDTO{
+		ID: user.ID,
+	}
+	entities.ConvertUserToDTO(user, userDto)
+	query := `
+				SELECT 
+					u.path_ava,
+					u.username,
+					u.firstname,
+					u.lastname,
+					u.number_phone,
+					u.rating,
+					u.verification_status,
+					u.role_id,
+					r.name AS role_name
+				FROM users u
+				JOIN user_roles r ON u.role_id = r.id
+				WHERE u.id = $1;
+				`
+	err := r.DB.QueryRow(ctx, query, userDto.ID).Scan(
+		&userDto.PathAva,
+		&userDto.Username,
+		&userDto.Firstname,
+		&userDto.Lastname,
+		&userDto.NumberPhone,
+		&userDto.Rating,
+		&userDto.VerificationStatus,
+		&userDto.Role.ID,
+		&userDto.Role.Name,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			r.log.Warn("GetUserByID: no user found", zap.Uint64("userID", userDto.ID))
+			return nil, nil // Возвращаем nil если пользователь не найден
+		}
+		r.log.Error("GetUserByID: query error", zap.Error(err))
+		return nil, err
+	}
+
+	entities.ConvertDTOToUser(userDto, user)
+	return user, nil
+}
+
+// Получение пользователя по username
+func (r *Repository) GetUserByUsername(ctx context.Context, user *entities.User) (*entities.User, error) {
+	userDto := &entities.UserDTO{}
+	entities.ConvertUserToDTO(user, userDto)
+	query := `
+				SELECT 
+				    u.id,
+					u.path_ava,
+					u.username,
+					u.firstname,
+					u.lastname,
+					u.number_phone,
+					u.rating,
+					u.verification_status,
+					u.role_id,
+					r.name AS role_name
+				FROM users u
+				JOIN user_roles r ON u.role_id = r.id
+				WHERE u.username = $1;
+				`
+	err := r.DB.QueryRow(ctx, query, user.Username).Scan(
+		&userDto.ID,
+		&userDto.PathAva,
+		&userDto.Username,
+		&userDto.Firstname,
+		&userDto.Lastname,
+		&userDto.NumberPhone,
+		&userDto.Rating,
+		&userDto.VerificationStatus,
+		&userDto.Role.ID,
+		&userDto.Role.Name,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			r.log.Warn("GetUserByUsername: no user found", zap.String("username", user.Username))
+			return nil, nil // Возвращаем nil если пользователь не найден
+		}
+		r.log.Error("GetUserByUsername: query error", zap.Error(err))
+		return nil, err
+	}
+
+	// Преобразуем DTO в сущность User
+	log.Println(userDto)
+	entities.ConvertDTOToUser(userDto, user)
+	log.Println(user)
+	return user, nil
 }

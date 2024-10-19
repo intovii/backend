@@ -9,4 +9,7 @@ func (s *Server) initRouter() {
 	})
 	s.app.Get("/get/advertisment/all_info", s.GetAdvertismentAllInfo)
 	s.app.Post("/user/create", s.CreateUser)
+	s.app.Get("/user/get", s.GetUser) // Маршрут для получения пользователя по ID
+	//s.app.Get("/user/username", s.GetUserByUsername) // Маршрут для получения пользователя по username
+
 }

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
-	"log"
 )
 
 type Usecase struct {
@@ -95,7 +94,6 @@ func (uc *Usecase) IsUsernameExist(ctx context.Context, user *entities.User) err
 }
 
 func (uc *Usecase) CreateUser(ctx context.Context, user *entities.User) interface{} {
-	log.Println(user)
 	if err := uc.IsUserExit(
 		ctx,
 		user,
@@ -137,5 +135,56 @@ func (uc *Usecase) CreateUser(ctx context.Context, user *entities.User) interfac
 	return fiber.Map{
 		"status":  4,
 		"message": "Successfully created user",
+	}
+}
+
+func (uc *Usecase) GetUserByID(ctx context.Context, user *entities.User) interface{} {
+	if err := uc.IsUserExit(
+		ctx,
+		user,
+	); err == nil {
+		uc.log.Error("GetUserByID error: %v", zap.Error(err))
+		return fiber.Map{
+			"status":  0,
+			"message": "user_id is not exist",
+		}
+	}
+	user, err := uc.Repo.GetUserByID(ctx, user)
+	if err != nil || user == nil {
+		uc.log.Error("GetUserByID error", zap.Error(err))
+		return fiber.Map{
+			"status":  1,
+			"message": "not found user",
+		}
+	}
+	return fiber.Map{
+		"status":  2,
+		"message": "Successfully get user",
+	}
+}
+
+// Получение пользователя по username
+func (uc *Usecase) GetUserByUsername(ctx context.Context, user *entities.User) interface{} {
+	if err := uc.IsUsernameExist(
+		ctx,
+		user,
+	); err == nil {
+		uc.log.Error("GetUserByUsername error: %v", zap.Error(err))
+		return fiber.Map{
+			"status":  0,
+			"message": "username is not exist",
+		}
+	}
+	user, err := uc.Repo.GetUserByUsername(ctx, user)
+	if err != nil || user == nil {
+		uc.log.Error("GetUserByUsername error", zap.Error(err))
+		return fiber.Map{
+			"status":  1,
+			"message": "not found user",
+		}
+	}
+	return fiber.Map{
+		"status":  2,
+		"message": "Successfully get user",
 	}
 }

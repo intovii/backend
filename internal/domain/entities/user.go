@@ -4,35 +4,33 @@ import (
 	"database/sql"
 )
 
-
 type UserRole struct {
-	ID uint32
+	ID   uint32
 	Name string
 }
 
-
 type User struct {
-	ID uint64
-	PathAva string
-	Username string
-	Firstname string
-	Lastname string
-	NumberPhone string
-	Rating float32
+	ID                 uint64
+	PathAva            string
+	Username           string
+	Firstname          string
+	Lastname           string
+	NumberPhone        string
+	Rating             float32
 	VerificationStatus string
-	Role UserRole 
+	Role               UserRole
 }
 
 type UserDTO struct {
-	ID uint64 `json:"id" db:"id"`
-	PathAva sql.NullString `json:"path_ava" db:"path_ava"`
-	Username sql.NullString `json:"username" db:"username"`
-	Firstname sql.NullString `json:"firstname" db:"firstname"`
-	Lastname sql.NullString `json:"lastname" db:"lastname"`
-	NumberPhone sql.NullString `json:"number_phone" db:"number_phone"`
-	Rating float32 `json:"rating" db:"rating"`
-	VerificationStatus string `json:"verification_status" db:"verification_status"`
-	Role UserRole
+	ID                 uint64         `json:"id" db:"id"`
+	PathAva            sql.NullString `json:"path_ava" db:"path_ava"`
+	Username           sql.NullString `json:"username" db:"username"`
+	Firstname          sql.NullString `json:"firstname" db:"firstname"`
+	Lastname           sql.NullString `json:"lastname" db:"lastname"`
+	NumberPhone        sql.NullString `json:"number_phone" db:"number_phone"`
+	Rating             float32        `json:"rating" db:"rating"`
+	VerificationStatus string         `json:"verification_status" db:"verification_status"`
+	Role               UserRole
 }
 
 func ConvertDTOToUser(dto *UserDTO, u *User) {
@@ -58,4 +56,3 @@ func ConvertUserToDTO(u *User, dto *UserDTO) {
 	dto.VerificationStatus = u.VerificationStatus
 	dto.Role = u.Role
 }
-
