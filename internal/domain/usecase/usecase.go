@@ -96,8 +96,8 @@ func (uc *Usecase) GetProfileUserAllInfo(ctx context.Context, user *entities.Use
 	return nil
 }
 
-func (uc *Usecase) GetProfileUserStatistics(ctx context.Context, uID uint64) (*[]*entities.Statistic, error) {
-	var stats []*entities.Statistic
+func (uc *Usecase) GetProfileUserStatistics(ctx context.Context, uID uint64) (*[]*entities.ProfileStatistic, error) {
+	var stats []*entities.ProfileStatistic
 	if exist, err := uc.Repo.IsUserExist(ctx, &entities.User{ID:uID}); err != nil || !exist {
 		uc.log.Error("user does not exist", zap.Error(err))
 		return nil, errors.New("user does not exist")
@@ -108,10 +108,65 @@ func (uc *Usecase) GetProfileUserStatistics(ctx context.Context, uID uint64) (*[
 		return nil, err
 	}
 	for _, stat := range stats{
-		if err := uc.Repo.GetStatisticAdPhoto(ctx, stat); err != nil{
+		var err error
+		stat.AdPhotoPath, err = uc.Repo.GetMainAdPhotoByAdID(ctx, stat.AdID)
+		if err != nil{
+			uc.log.Error("fail to get Photos by Advertisment ID", zap.Error(err))
+		}
+		if exist, err := uc.Repo.IsReviewExistByDealID(ctx, stat.DealID); err != nil || !exist {
+			uc.log.Error("review does not exist", zap.Error(err))
+		}
+		if err := uc.Repo.GetStatisticAdReviewMark(ctx, stat); err != nil{
+			uc.log.Error("fail to get Review by Deal ID", zap.Error(err))
+		}
+
+	}
+	
+	return &stats, nil
+}
+
+func (uc *Usecase) GetProfileMyAdvertisments(ctx context.Context, uID uint64) (*[]*entities.MyAdvertisement, error) {
+	var advertisements []*entities.MyAdvertisement
+	if exist, err := uc.Repo.IsUserExist(ctx, &entities.User{ID:uID}); err != nil || !exist {
+		uc.log.Error("user does not exist", zap.Error(err))
+		return nil, errors.New("user does not exist")
+	}
+
+	if err := uc.Repo.GetProfileMyAdvertisments(ctx, uID, &advertisements); err != nil {
+		uc.log.Error("fail to get ads by user id", zap.Error(err))
+		return nil, err
+	}
+	
+	for _, ad := range advertisements{
+		var err error
+		ad.AdPhotoPath, err = uc.Repo.GetMainAdPhotoByAdID(ctx, ad.AdID)
+		if err != nil {
 			uc.log.Error("fail to get Photos by Advertisment ID", zap.Error(err))
 		}
 	}
 	
-	return &stats, nil
+	return &advertisements, nil
+}
+
+func (uc *Usecase) GetProfileReviews(ctx context.Context, uID uint64) (*[]*entities.ProfileReview, error) {
+	var reviews []*entities.ProfileReview
+	if exist, err := uc.Repo.IsUserExist(ctx, &entities.User{ID:uID}); err != nil || !exist {
+		uc.log.Error("user does not exist", zap.Error(err))
+		return nil, errors.New("user does not exist")
+	}
+
+	if err := uc.Repo.GetProfileReviews(ctx, uID, &reviews); err != nil {
+		uc.log.Error("fail to get reviews by user id", zap.Error(err))
+		return nil, err
+	}
+	
+	// for _, ad := range reviews{
+	// 	var err error
+	// 	ad.AdPhotoPath, err = uc.Repo.GetMainAdPhotoByAdID(ctx, ad.AdID)
+	// 	if err != nil {
+	// 		uc.log.Error("fail to get Photos by Advertisment ID", zap.Error(err))
+	// 	}
+	// }
+	
+	return &reviews, nil
 }

@@ -10,4 +10,7 @@ func (s *Server) initRouter() {
 	s.app.Get("/get/advertisment/all_info", s.GetAdvertismentAllInfo)
 	s.app.Get("/get/profile/all_info", s.GetProfileUserAllInfo)
 	s.app.Get("/get/profile/statistics", s.GetProfileUserStatistics)
+	s.app.Get("/get/profile/my_ads", s.GetProfileMyAdvertisments)
+	s.app.Get("/get/profile/reviews", s.GetProfileReviews)
+	
 }

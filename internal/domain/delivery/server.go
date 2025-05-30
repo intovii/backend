@@ -191,7 +191,7 @@ func (s *Server) GetProfileUserStatistics(FCtx *fiber.Ctx) error {
 			},
 		)
     }
-	var statisticAdsInfo *[]*entities.Statistic
+	var statisticAdsInfo *[]*entities.ProfileStatistic
 	if statisticAdsInfo, err = s.Usecase.GetProfileUserStatistics(FCtx.Context(), uint64(uID)); err != nil {
 		s.logger.Error("Can not get statistics info", zap.Error(err))
 		return FCtx.Status(fiber.StatusBadRequest).JSON(
@@ -204,4 +204,64 @@ func (s *Server) GetProfileUserStatistics(FCtx *fiber.Ctx) error {
 		)
 	}
 	return FCtx.JSON(statisticAdsInfo)
+}
+
+func (s *Server) GetProfileMyAdvertisments(FCtx *fiber.Ctx) error {
+	var uID int
+	var err error
+	uIDParam := FCtx.Query("user_id")
+    if uID, err = strconv.Atoi(uIDParam); err != nil {
+		s.logger.Error("Invalid user_id parameter", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusInvalidParams,
+					"text": common.ErrInvalidParams,
+				},
+			},
+		)
+    }
+	var advertisements *[]*entities.MyAdvertisement
+	if advertisements, err = s.Usecase.GetProfileMyAdvertisments(FCtx.Context(), uint64(uID)); err != nil {
+		s.logger.Error("Can not get info for Profile My Ads", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusGetInfo,
+					"text": common.ErrGetInfo,
+				},
+			},
+		)
+	}
+	return FCtx.JSON(advertisements)
+}
+
+func (s *Server) GetProfileReviews(FCtx *fiber.Ctx) error {
+	var uID int
+	var err error
+	uIDParam := FCtx.Query("user_id")
+    if uID, err = strconv.Atoi(uIDParam); err != nil {
+		s.logger.Error("Invalid user_id parameter", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusInvalidParams,
+					"text": common.ErrInvalidParams,
+				},
+			},
+		)
+    }
+	var reviews *[]*entities.ProfileReview
+	if reviews, err = s.Usecase.GetProfileReviews(FCtx.Context(), uint64(uID)); err != nil {
+		s.logger.Error("Can not get info for Profile Reviews", zap.Error(err))
+		return FCtx.Status(fiber.StatusBadRequest).JSON(
+			fiber.Map{
+				"message": fiber.Map{
+					"status": common.StatusGetInfo,
+					"text": common.ErrGetInfo,
+				},
+			},
+		)
+	}
+	return FCtx.JSON(reviews)
 }

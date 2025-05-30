@@ -2,6 +2,7 @@ package entities
 
 import (
 	// "database/sql"
+	"database/sql"
 	"time"
 )
 
@@ -49,26 +50,61 @@ type Deal struct {
 	DateDeal time.Time
 }
 
-type Statistic struct {
-	AdID		uint64
-	AdName		string
-	AdPrice		float32
-	AdReview	Review
-	AdPhoto		AdPhoto
+type ProfileStatistic struct {
+	DealID 			uint64
+	AdID			uint64
+	DealReviewID	uint64
+	AdName			string
+	AdPrice			float32
+	AdReviewMark	uint16
+	AdPhotoPath		string
 }
 
-type StatisticDTO struct {
-	AdID		int64
-	AdName		string
-	AdPrice		float32
-	AdReview	Review
-	AdPhoto		AdPhoto
+type MyAdvertisement struct {
+	AdID					uint64
+	AdPhotoPath				string
+	AdName					string
+	AdPrice					float64
+	AdCountViews			uint32
+	AdTypePromotionID		uint64
+	AdTypePromotionName		string
+	AdDateExpirePromotion	*time.Time
 }
 
-func ConvertDTOToStatistic(dto *StatisticDTO, stat *Statistic) {
-	stat.AdID = uint64(dto.AdID)
-	stat.AdName = dto.AdName
-	stat.AdPrice = dto.AdPrice
-	stat.AdReview = dto.AdReview
-	stat.AdPhoto = dto.AdPhoto
+type ProfileReview struct {
+	AdID uint64
+	DealID uint64
+	ReviewID uint64
+	ReviewerID uint64
+	ReviewText string
+	ReviewMark uint16
+	ReviewerPathAva string
+	ReviewerUsername string
+	ReviewerFirstname string
+	ReviewerLastname string
+}
+type ProfileReviewDTO struct {
+	AdID uint64
+	DealID uint64
+	ReviewID uint64
+	ReviewerID uint64
+	ReviewText string
+	ReviewMark uint16
+	ReviewerPathAva sql.NullString
+	ReviewerUsername sql.NullString
+	ReviewerFirstname sql.NullString
+	ReviewerLastname sql.NullString
+}
+
+func ConvertDTOToProfileReview(dto *ProfileReviewDTO, review *ProfileReview) {
+	review.AdID = dto.AdID
+	review.DealID = dto.DealID
+	review.ReviewID = dto.ReviewID
+	review.ReviewerID = dto.ReviewerID
+	review.ReviewText = dto.ReviewText
+	review.ReviewMark = dto.ReviewMark
+	review.ReviewerPathAva = dto.ReviewerPathAva.String
+	review.ReviewerUsername = dto.ReviewerUsername.String
+	review.ReviewerFirstname = dto.ReviewerFirstname.String
+	review.ReviewerLastname = dto.ReviewerLastname.String
 }

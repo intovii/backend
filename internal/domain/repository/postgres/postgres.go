@@ -115,7 +115,7 @@ func (r *Repository) GetAdvertismentAllInfo(ctx context.Context, advertisment *e
 		&adto.TypePromotion.TimeLive,
 		&adto.AdvertismentCategory.Name,
 	); err != nil{
-		r.log.Error("GetUserProfile: error with SELECT FROM", zap.Error(err))
+		r.log.Error("GetAdvertismentAllInfo: error with SELECT FROM", zap.Error(err))
 		return err
 	}
 	entities.ConvertDTOToAdvertisment(adto, advertisment)
@@ -291,8 +291,46 @@ func (r *Repository) GetAdvertismentPhotos(ctx context.Context, advertisment *en
 	return nil
 }
 
-func (r *Repository) GetStatisticAdPhoto(ctx context.Context, stat *entities.Statistic) error {
-	if err := r.DB.QueryRow(ctx, queryGetPhotos, stat.AdID,).Scan(&stat.AdPhoto.Path,); err != nil{
+func (r *Repository) GetMainAdPhotoByAdID(ctx context.Context, adID uint64) (string, error) {
+	var adPhotoPath string
+	if err := r.DB.QueryRow(ctx, queryGetPhotos, adID,).Scan(&adPhotoPath,); err != nil{
+		r.log.Error("GetStatisticAdPhoto: error with SELECT FROM", zap.Error(err))
+		return "", err
+	}
+	
+	return adPhotoPath, nil
+}
+
+const  queryGetReviewByDealID = `
+SELECT EXIST	(SELECT 
+					r.id
+				FROM reviews r
+				WHERE r.deal_id = $1;)
+`
+
+func (r *Repository) IsReviewExistByDealID(ctx context.Context, dealID uint64) (bool, error) {
+	var res bool
+	err := r.DB.QueryRow(ctx, queryGetReviewByDealID, dealID).Scan(&res)
+	if err != nil{
+		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
+		return false, err
+	}
+	return res, nil
+}
+
+const queryGetGetStatisticAdReviewMark = `
+SELECT 
+	r.id,
+	r.mark
+FROM reviews r
+WHERE r.deal_id = $1;
+`
+
+func (r *Repository) GetStatisticAdReviewMark(ctx context.Context, stat *entities.ProfileStatistic) error {
+	if err := r.DB.QueryRow(ctx, queryGetGetStatisticAdReviewMark, stat.AdID,).Scan(
+		&stat.DealReviewID,
+		&stat.AdReviewMark,
+		); err != nil{
 		r.log.Error("GetStatisticAdPhoto: error with SELECT FROM", zap.Error(err))
 		return err
 	}
@@ -374,17 +412,18 @@ func (r *Repository) GetStatisticAdPhoto(ctx context.Context, stat *entities.Sta
 
 const queryGetAdsByBuyerID = `
 	SELECT 
+		d.id,
 		d.advertisement_id,
 		a.name,
-		a.price,
-		r.mark
-	FROM deals d
-	JOIN reviews r ON d.id = r.deal_id
-	JOIN advertisements a ON d.advertisement_id = a.id
+		a.price
+		FROM deals d
+		JOIN advertisements a ON d.advertisement_id = a.id
 	WHERE d.buyer_id = $1;
 `
+		// r.mark
+	// JOIN reviews r ON d.id = r.deal_id
 
-func (r *Repository) GetProfileUserStatistics(ctx context.Context, uID uint64, stats *[]*entities.Statistic) error {
+func (r *Repository) GetProfileUserStatistics(ctx context.Context, uID uint64, stats *[]*entities.ProfileStatistic) error {
 	rows, err := r.DB.Query(ctx, queryGetAdsByBuyerID, uID)
 	if err != nil{
 		r.log.Error("GetAdvertismentsByBuyerID: error with SELECT FROM", zap.Error(err))
@@ -394,20 +433,21 @@ func (r *Repository) GetProfileUserStatistics(ctx context.Context, uID uint64, s
 
 	// Сканируем результаты в срез
 	for rows.Next() {
-		stat := &entities.Statistic{}
-		dto := &entities.StatisticDTO{
-			AdReview: entities.Review{},
-		}
+		stat := &entities.ProfileStatistic{}
+		// dto := &entities.StatisticDTO{
+		// 	AdReview: entities.Review{},
+		// }
 		if err := rows.Scan(
-			&dto.AdID,
-			&dto.AdName,
-			&dto.AdPrice,
-			&dto.AdReview.Mark,
+			&stat.DealID,
+			&stat.AdID,
+			&stat.AdName,
+			&stat.AdPrice,
+			// &stat.AdReviewMark,
 			); err != nil {
 			r.log.Error("GetAdvertismentsByBuyerID: error with scan row", zap.Error(err))
 			return err		
 		}
-		entities.ConvertDTOToStatistic(dto, stat)
+		// entities.ConvertDTOToStatistic(dto, stat)
 		*stats = append(*stats, stat)
 	}
 
@@ -419,20 +459,109 @@ func (r *Repository) GetProfileUserStatistics(ctx context.Context, uID uint64, s
 }
 
 
+const queryGetProfileMyAdvertisments = `
+SELECT
+	a.id,
+	a.name,
+	a.price,
+	a.views_count,
+	a.type_id,
+	tp.name,
+	a.date_expire_promotion
+FROM advertisements a
+	JOIN types_promotion tp ON a.type_id = tp.id
+WHERE 
+	a.user_id = $1;
+`
 
 
-// const queryGetReviewByAdReviewer = `
-// SELECT EXISTS (SELECT id
-// FROM reviews
-// WHERE advertisement_id = $1 AND reviewer_id = $2);
-// `
+func (r *Repository) GetProfileMyAdvertisments(ctx context.Context, uID uint64, advertisements *[]*entities.MyAdvertisement) error {
+	rows, err := r.DB.Query(ctx, queryGetProfileMyAdvertisments, uID)
+	if err != nil{
+		r.log.Error("GetProfileMyAdvertisments: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	defer rows.Close()
 
-// func (r *Repository) IsRviewExistByAdReviewer(ctx context.Context, ad uID uint64) (bool, error) {
-// 	var res bool
-// 	err := r.DB.QueryRow(ctx, queryGetUser, user.ID).Scan(&res)
-// 	if err != nil{
-// 		r.log.Error("IsAdExist: error with QueryRow", zap.Error(err))
-// 		return false, err
-// 	}
-// 	return res, nil
-// }
+	// Сканируем результаты в срез
+	for rows.Next() {
+		ad := entities.MyAdvertisement{}
+		if err := rows.Scan(
+			&ad.AdID,
+			&ad.AdName,
+			&ad.AdPrice,
+			&ad.AdCountViews,
+			&ad.AdTypePromotionID,
+			&ad.AdTypePromotionName,
+			&ad.AdDateExpirePromotion,
+			); err != nil {
+			r.log.Error("GetProfileMyAdvertisments: error with scan row", zap.Error(err))
+			return err		
+		}
+		*advertisements = append(*advertisements, &ad)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.log.Error("GetProfileMyAdvertisments: error iterating through rows", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+const queryGetProfileReviews = `
+SELECT
+	a.id,
+	d.id,
+	r.id,
+	u.id,
+	r.text,
+	r.mark,
+	u.path_ava,
+	u.username,
+	u.firstname,
+	u.lastname
+FROM advertisements a
+	JOIN deals d ON a.id = d.advertisement_id
+	JOIN reviews r ON d.id = r.deal_id
+	JOIN users u ON d.buyer_id = u.id
+WHERE 
+	a.user_id = $1;
+`
+
+func (r *Repository) GetProfileReviews(ctx context.Context, uID uint64, reviews *[]*entities.ProfileReview) error {
+	rows, err := r.DB.Query(ctx, queryGetProfileReviews, uID)
+	if err != nil{
+		r.log.Error("GetProfileReviews: error with SELECT FROM", zap.Error(err))
+		return err
+	}
+	defer rows.Close()
+
+	// Сканируем результаты в срез
+	for rows.Next() {
+		review := entities.ProfileReview{}
+		dto := entities.ProfileReviewDTO{}
+		if err := rows.Scan(
+			&dto.AdID,
+			&dto.DealID,
+			&dto.ReviewID,
+			&dto.ReviewerID,
+			&dto.ReviewText,
+			&dto.ReviewMark,
+			&dto.ReviewerPathAva,
+			&dto.ReviewerUsername,
+			&dto.ReviewerFirstname,
+			&dto.ReviewerLastname,
+			); err != nil {
+			r.log.Error("GetProfileReviews: error with scan row", zap.Error(err))
+			return err		
+		}
+		entities.ConvertDTOToProfileReview(&dto, &review)
+		*reviews = append(*reviews, &review)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.log.Error("GetProfileReviews: error iterating through rows", zap.Error(err))
+		return err
+	}
+	return nil
+}
